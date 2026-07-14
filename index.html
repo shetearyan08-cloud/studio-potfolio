@@ -203,9 +203,236 @@ html.lenis, html.lenis body { height: auto; }
   border-radius: 50%;
   background: var(--color-fg);
 }
+
+/* ===================================================================
+   PHASE 3 — PINNED SCALE SECTION
+   The background box scales down as the section stays pinned, while
+   text scrolls over it. Achieved by pinning the whole section and
+   scrubbing a scale transform on the background layer to GSAP.
+   =================================================================== */
+.pin-section {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: #08080a;
+}
+
+.pin-section__bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+.pin-section__bg-inner {
+  width: 90vw;
+  height: 90vh;
+  border-radius: 24px;
+  background: linear-gradient(160deg, #5b2a86 0%, #0f8b8d 55%, #c9a24b 100%);
+  opacity: 0.85;
+}
+
+.pin-section__text {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.pin-section__text h2 {
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  font-weight: 700;
+  max-width: 16ch;
+  color: #08080a;
+  mix-blend-mode: difference;
+}
+
+/* ===================================================================
+   PHASE 3 — DIRECTION-AWARE TEXT REVEAL
+   Blocks fade/slide in as you scroll down into view, and reverse
+   (fade/slide out) as you scroll back up past them — direction is
+   read from Lenis/ScrollTrigger and applied to the animation.
+   =================================================================== */
+.reveal-section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 120px;
+  padding: 160px 24px;
+}
+
+.reveal-block {
+  max-width: 720px;
+  text-align: center;
+}
+
+.reveal-block__mask {
+  overflow: hidden;
+}
+
+.reveal-block__mask p {
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  font-weight: 500;
+  line-height: 1.4;
+  transform: translateY(100%);
+  will-change: transform;
+}
+
+/* ===================================================================
+   PHASE 3 — HORIZONTAL GALLERY (pinned, driven by vertical scroll)
+   =================================================================== */
+.gallery-section {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.gallery-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 8vw;
+  will-change: transform;
+}
+
+.gallery-card {
+  flex: 0 0 auto;
+  width: min(60vw, 560px);
+  height: 62vh;
+  border-radius: 20px;
+  display: flex;
+  align-items: flex-end;
+  padding: 32px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: linear-gradient(150deg, #1a1a22, #0d0d10);
+  border: 1px solid rgba(242, 242, 240, 0.08);
+}
+
+.gallery-card:nth-child(odd) {
+  background: linear-gradient(150deg, #241a2e, #0d0d10);
+}
+
+/* ===================================================================
+   FUTURISTIC MOTION LAYER
+   =================================================================== */
+
+/* --- Custom magnetic cursor (desktop / mouse devices only) --- */
+.has-custom-cursor, .has-custom-cursor a, .has-custom-cursor button {
+  cursor: none;
+}
+.cursor-dot, .cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  pointer-events: none;
+  z-index: 10000;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--color-fg);
+  mix-blend-mode: difference;
+}
+.cursor-ring {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(242, 242, 240, 0.5);
+  transition: width 0.25s ease, height 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  mix-blend-mode: difference;
+}
+.cursor-ring.is-hovering {
+  width: 60px;
+  height: 60px;
+  border-color: #c9a24b;
+  background: rgba(201, 162, 75, 0.08);
+}
+
+/* --- Scanline / grid overlay for a subtle sci-fi texture in the hero --- */
+.hero-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(242, 242, 240, 0.025) 0px,
+    rgba(242, 242, 240, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
+}
+.hero-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(201, 162, 75, 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 100% 300%;
+  animation: scan-sweep 6s linear infinite;
+}
+@keyframes scan-sweep {
+  0%   { background-position: 0 0%; }
+  100% { background-position: 0 100%; }
+}
+
+/* --- Animated conic-gradient border for gallery cards --- */
+@property --angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.gallery-card {
+  position: relative;
+  isolation: isolate; /* keeps the ::before border layer clipped correctly */
+}
+.gallery-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px; /* border thickness */
+  background: conic-gradient(from var(--angle), #5b2a86, #0f8b8d, #c9a24b, #5b2a86);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rotate-border 4s linear infinite;
+  opacity: 0.7;
+}
+@keyframes rotate-border {
+  to { --angle: 360deg; }
+}
+
+/* Magnetic elements get a will-change hint so the transform stays on the GPU */
+.magnetic {
+  will-change: transform;
+}
 </style>
 </head>
 <body>
+
+  <!-- Custom magnetic cursor: two layers so the dot and ring can lag differently -->
+  <div class="cursor-dot" id="cursor-dot"></div>
+  <div class="cursor-ring" id="cursor-ring"></div>
 
   <!-- PRELOADER -->
   <div id="preloader" aria-hidden="true">
@@ -225,15 +452,16 @@ html.lenis, html.lenis body { height: auto; }
       <header class="site-header" data-nav>
         <div class="logo">STUDIO</div>
         <nav>
-          <a href="#work">Work</a>
-          <a href="#about">About</a>
-          <a href="#contact">Contact</a>
+          <a href="#work" class="magnetic">Work</a>
+          <a href="#about" class="magnetic">About</a>
+          <a href="#contact" class="magnetic">Contact</a>
         </nav>
       </header>
 
       <main>
         <section id="hero" class="section section--hero">
           <canvas id="hero-canvas"></canvas>
+          <div class="hero-scanlines"></div>
 
           <div class="hero-content">
             <h1 class="hero-title" id="hero-title">
@@ -253,8 +481,44 @@ html.lenis, html.lenis body { height: auto; }
           </div>
         </section>
 
-        <section id="work" class="section">
-          <!-- Phase 3 content goes here -->
+        <!-- PINNED SCALE SECTION -->
+        <section class="pin-section" id="pin-section">
+          <div class="pin-section__bg" id="pin-bg">
+            <div class="pin-section__bg-inner"></div>
+          </div>
+          <div class="pin-section__text">
+            <h2>A statement placeholder that scrolls over a shrinking backdrop.</h2>
+          </div>
+        </section>
+
+        <!-- DIRECTION-AWARE TEXT REVEAL -->
+        <section class="reveal-section" id="reveal-section">
+          <div class="reveal-block">
+            <div class="reveal-block__mask">
+              <p>Placeholder line one — reveals as you scroll down into it.</p>
+            </div>
+          </div>
+          <div class="reveal-block">
+            <div class="reveal-block__mask">
+              <p>Placeholder line two — same effect, staggered further down the page.</p>
+            </div>
+          </div>
+          <div class="reveal-block">
+            <div class="reveal-block__mask">
+              <p>Placeholder line three — scroll back up and watch these hide again.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- HORIZONTAL GALLERY, PINNED, DRIVEN BY VERTICAL SCROLL -->
+        <section id="work" class="gallery-section">
+          <div class="gallery-track" id="gallery-track">
+            <div class="gallery-card magnetic">Project 01</div>
+            <div class="gallery-card magnetic">Project 02</div>
+            <div class="gallery-card magnetic">Project 03</div>
+            <div class="gallery-card magnetic">Project 04</div>
+            <div class="gallery-card magnetic">Project 05</div>
+          </div>
         </section>
       </main>
 
@@ -373,6 +637,7 @@ html.lenis, html.lenis body { height: auto; }
       const uniforms = {
         u_time: { value: 0 },
         u_mouse: { value: new THREE.Vector2(0, 0) },
+        u_velocity: { value: 0 }, // scroll velocity, boosts distortion briefly when scrolling fast
         // Deep jewel tones: violet -> teal -> amber, mixed via fresnel/normal
         u_colorA: { value: new THREE.Color('#5b2a86') }, // deep violet
         u_colorB: { value: new THREE.Color('#0f8b8d') }, // deep teal
@@ -384,6 +649,7 @@ html.lenis, html.lenis body { height: auto; }
         vertexShader: `
           uniform float u_time;
           uniform vec2 u_mouse;
+          uniform float u_velocity;
           varying vec3 v_normal;
           varying vec3 v_position;
 
@@ -441,7 +707,10 @@ html.lenis, html.lenis body { height: auto; }
 
             // Slow continuous morphing: low frequency noise sampled over time
             float slow = u_time * 0.15;
-            float displacement = snoise(position * 1.1 + slow) * 0.18;
+            // Fast scrolling briefly amplifies the surface distortion, like the
+            // blob is picking up energy from the scroll motion
+            float velocityBoost = 1.0 + clamp(abs(u_velocity) * 0.08, 0.0, 1.2);
+            float displacement = snoise(position * 1.1 + slow) * 0.18 * velocityBoost;
 
             // Gentle reactive bulge toward the mouse position — subtle, not literal tracking
             float mouseInfluence = 0.12 * (u_mouse.x * position.x + u_mouse.y * position.y);
@@ -503,6 +772,8 @@ html.lenis, html.lenis body { height: auto; }
       resize();
 
       const clock = new THREE.Clock();
+      let targetVelocity = 0;
+      let currentVelocity = 0;
 
       function tick() {
         // Smoothly ease current mouse toward target — this is what makes the
@@ -510,11 +781,17 @@ html.lenis, html.lenis body { height: auto; }
         currentMouse.x += (targetMouse.x - currentMouse.x) * 0.04;
         currentMouse.y += (targetMouse.y - currentMouse.y) * 0.04;
 
+        // Ease scroll velocity toward its target too, and decay it back to 0
+        // when scrolling stops, so the "energy" fades out smoothly.
+        currentVelocity += (targetVelocity - currentVelocity) * 0.08;
+        targetVelocity *= 0.9;
+
         uniforms.u_time.value = clock.getElapsedTime();
         uniforms.u_mouse.value.set(currentMouse.x, currentMouse.y);
+        uniforms.u_velocity.value = currentVelocity;
 
         // Slow continuous rotation + subtle parallax tilt toward the cursor
-        blob.rotation.y += 0.0015;
+        blob.rotation.y += 0.0015 + Math.abs(currentVelocity) * 0.0004;
         blob.rotation.x = currentMouse.y * 0.15;
         blob.rotation.z = currentMouse.x * 0.1;
 
@@ -526,7 +803,11 @@ html.lenis, html.lenis body { height: auto; }
         renderer.render(scene, camera);
       }
 
-      return { tick, resize };
+      function setVelocity(v) {
+        targetVelocity = v;
+      }
+
+      return { tick, resize, setVelocity };
     }
 
     /* =================================================================
@@ -536,6 +817,12 @@ html.lenis, html.lenis body { height: auto; }
        ================================================================= */
     function animateHeroIn() {
       const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+
+      // Decrypt-style scramble runs in parallel with the mask slide-up,
+      // staggered the same way, so text "materializes" as it slides into place.
+      gsap.utils.toArray('.hero-title .line-inner').forEach((el, i) => {
+        gsap.delayedCall(i * 0.12, () => scrambleReveal(el, 1.0));
+      });
 
       tl.to('.hero-title .line-inner', {
         y: '0%',
@@ -561,12 +848,208 @@ html.lenis, html.lenis body { height: auto; }
     }
 
     /* =================================================================
-       5. INIT
+       5. PHASE 3 — SCROLL-DRIVEN CINEMATIC ANIMATIONS
+       ================================================================= */
+
+    /**
+     * initPinScale
+     * Pins the section in place while the background shrinks as you
+     * scroll through it, so the text feels like it's scrolling "over"
+     * a backdrop that's physically receding.
+     */
+    function initPinScale() {
+      gsap.to('#pin-bg', {
+        scale: 0.55,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '#pin-section',
+          start: 'top top',
+          end: '+=120%', // pin lasts for 1.2x the viewport height of scroll distance
+          pin: true,
+          scrub: true, // ties animation progress directly to scroll position
+        },
+      });
+    }
+
+    /**
+     * initDirectionAwareReveal
+     * Each block reveals (masks up into view) when scrolled down into
+     * frame, and reverses (masks back down out of view) if the user
+     * scrolls back up past it — because the ScrollTrigger is set to
+     * "toggleActions" that re-run in reverse, not just fade permanently.
+     */
+    function initDirectionAwareReveal() {
+      const blocks = gsap.utils.toArray('.reveal-block__mask p');
+
+      blocks.forEach((el) => {
+        gsap.to(el, {
+          y: '0%',
+          duration: 1,
+          ease: 'power4.out',
+          scrollTrigger: {
+            trigger: el,
+            start: 'top 80%',
+            end: 'bottom 20%',
+            // enter: play forward. leave: reverse (hides again scrolling down past it).
+            // enterBack: play forward again (reveals scrolling back up).
+            // leaveBack: reverse (hides again scrolling up past it, out the top).
+            toggleActions: 'play reverse play reverse',
+          },
+        });
+      });
+    }
+
+    /**
+     * initHorizontalGallery
+     * Classic "pin + translateX tied to vertical scroll progress" pattern.
+     * The section stays pinned for a scroll distance proportional to how
+     * far the track needs to travel horizontally.
+     */
+    function initHorizontalGallery() {
+      const track = document.getElementById('gallery-track');
+
+      // How far the track needs to move so its last card ends flush with
+      // the right edge of the viewport.
+      const getScrollDistance = () => track.scrollWidth - window.innerWidth;
+
+      gsap.to(track, {
+        x: () => -getScrollDistance(),
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '#work',
+          start: 'top top',
+          end: () => `+=${getScrollDistance()}`,
+          pin: true,
+          scrub: true,
+          invalidateOnRefresh: true, // recompute distance correctly after resize
+        },
+      });
+    }
+
+    /* =================================================================
+       FUTURISTIC MOTION LAYER
+       ================================================================= */
+
+    /**
+     * initCustomCursor
+     * A two-layer cursor (fast dot + lagging ring) that swells and
+     * accent-colors over interactive elements. Skipped entirely on
+     * touch/coarse-pointer devices, where a custom cursor makes no sense.
+     */
+    function initCustomCursor() {
+      const isFinePointer = window.matchMedia('(pointer: fine)').matches;
+      if (!isFinePointer) return;
+
+      document.documentElement.classList.add('has-custom-cursor');
+
+      const dot = document.getElementById('cursor-dot');
+      const ring = document.getElementById('cursor-ring');
+
+      // quickTo creates a reusable tween function — much cheaper than
+      // calling gsap.to() fresh on every single mousemove event.
+      const dotX = gsap.quickTo(dot, 'x', { duration: 0.1, ease: 'power3.out' });
+      const dotY = gsap.quickTo(dot, 'y', { duration: 0.1, ease: 'power3.out' });
+      const ringX = gsap.quickTo(ring, 'x', { duration: 0.45, ease: 'power3.out' });
+      const ringY = gsap.quickTo(ring, 'y', { duration: 0.45, ease: 'power3.out' });
+
+      window.addEventListener('mousemove', (e) => {
+        dotX(e.clientX);
+        dotY(e.clientY);
+        ringX(e.clientX);
+        ringY(e.clientY);
+      });
+
+      // Event delegation: any element the user might hover gets the "is-hovering" state
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, .magnetic')) {
+          ring.classList.add('is-hovering');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, .magnetic')) {
+          ring.classList.remove('is-hovering');
+        }
+      });
+    }
+
+    /**
+     * initMagnetic
+     * Elements with class "magnetic" gently pull toward the cursor when
+     * it's nearby, and spring back to rest on mouse-leave. A classic
+     * premium-site micro-interaction.
+     */
+    function initMagnetic() {
+      const isFinePointer = window.matchMedia('(pointer: fine)').matches;
+      if (!isFinePointer) return;
+
+      document.querySelectorAll('.magnetic').forEach((el) => {
+        const strength = 0.35; // how far it travels relative to cursor offset
+
+        el.addEventListener('mousemove', (e) => {
+          const rect = el.getBoundingClientRect();
+          const relX = e.clientX - (rect.left + rect.width / 2);
+          const relY = e.clientY - (rect.top + rect.height / 2);
+          gsap.to(el, {
+            x: relX * strength,
+            y: relY * strength,
+            duration: 0.4,
+            ease: 'power3.out',
+          });
+        });
+
+        el.addEventListener('mouseleave', () => {
+          gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.4)' });
+        });
+      });
+    }
+
+    /**
+     * scrambleReveal
+     * Decrypt-style text effect: characters flicker through a random set
+     * before settling into the real letter, left to right. Pairs with the
+     * existing mask-up slide for a "digital materializing" feel rather
+     * than a plain fade.
+     */
+    function scrambleReveal(el, duration = 1.1) {
+      const finalText = el.textContent;
+      const chars = '!<>-_\\/[]{}=+*^?#01';
+      const proxy = { progress: 0 };
+
+      return gsap.to(proxy, {
+        progress: 1,
+        duration,
+        ease: 'power2.out',
+        onUpdate: () => {
+          const revealCount = Math.floor(proxy.progress * finalText.length);
+          let out = '';
+          for (let i = 0; i < finalText.length; i++) {
+            if (i < revealCount || finalText[i] === ' ') {
+              out += finalText[i];
+            } else {
+              out += chars[Math.floor(Math.random() * chars.length)];
+            }
+          }
+          el.textContent = out;
+        },
+        onComplete: () => {
+          el.textContent = finalText; // guarantees a clean, correct final string
+        },
+      });
+    }
+
+    /* =================================================================
+       INIT
        ================================================================= */
     async function init() {
       const lenis = initSmoothScroll();
       const canvas = document.getElementById('hero-canvas');
       const blobScene = initHeroBlob(canvas);
+
+      // Feed Lenis's own velocity reading into the blob shader so the
+      // surface reacts to how fast the user is actually scrolling.
+      lenis.on('scroll', (e) => {
+        blobScene.setVelocity(e.velocity);
+      });
 
       // Single requestAnimationFrame driver for everything: GSAP ticker
       // drives Lenis AND the Three.js render loop, so all three stay
@@ -576,9 +1059,19 @@ html.lenis, html.lenis body { height: auto; }
         blobScene.tick();
       });
 
+      initCustomCursor();
+      initMagnetic();
+
       await runPreloader();
       document.body.classList.add('is-ready');
       animateHeroIn();
+
+      // Phase 3 scroll-driven sections. Set up after the preloader is gone
+      // so ScrollTrigger measures final, settled layout positions.
+      initPinScale();
+      initDirectionAwareReveal();
+      initHorizontalGallery();
+      ScrollTrigger.refresh();
 
       window.__lenis = lenis;
     }
