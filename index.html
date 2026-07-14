@@ -546,12 +546,14 @@ html.lenis, html.lenis body { height: auto; }
        1. SMOOTH SCROLL (Lenis <-> GSAP ScrollTrigger sync)
        ================================================================= */
     function initSmoothScroll() {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
       const lenis = new Lenis({
-        duration: 1.2,
+        duration: prefersReducedMotion ? 0 : 1.2,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         orientation: 'vertical',
         gestureOrientation: 'vertical',
-        smoothWheel: true,
+        smoothWheel: !prefersReducedMotion,
         wheelMultiplier: 1,
         touchMultiplier: 2,
         syncTouch: false,
@@ -630,9 +632,12 @@ html.lenis, html.lenis body { height: auto; }
       // Cap pixel ratio at 2 — going higher on retina/4K screens tanks perf for no visible gain
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-      // High-ish segment count for a smooth organic surface once displaced.
-      // 128x128 is plenty detailed but still cheap for a single hero object.
-      const geometry = new THREE.SphereGeometry(1.4, 128, 128);
+      // Respect users who've asked for reduced motion: a lower-poly sphere
+      // still looks fine as a static/mostly-still shape and costs much less
+      // to render every frame.
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const segments = prefersReducedMotion ? 48 : 128;
+      const geometry = new THREE.SphereGeometry(1.4, segments, segments);
 
       const uniforms = {
         u_time: { value: 0 },
@@ -775,7 +780,15 @@ html.lenis, html.lenis body { height: auto; }
       let targetVelocity = 0;
       let currentVelocity = 0;
 
+      // Perf gate: only actually render when the hero is on-screen AND the
+      // browser tab is visible. Saves GPU/battery on long scrolls and
+      // background tabs — the single biggest win for a page that runs a
+      // continuous render loop.
+      let isVisible = true;
+
       function tick() {
+        if (!isVisible) return; // skip all work entirely, not just the draw call
+
         // Smoothly ease current mouse toward target — this is what makes the
         // reaction feel "gentle" rather than "distracting" per the brief.
         currentMouse.x += (targetMouse.x - currentMouse.x) * 0.04;
@@ -790,10 +803,12 @@ html.lenis, html.lenis body { height: auto; }
         uniforms.u_mouse.value.set(currentMouse.x, currentMouse.y);
         uniforms.u_velocity.value = currentVelocity;
 
-        // Slow continuous rotation + subtle parallax tilt toward the cursor
-        blob.rotation.y += 0.0015 + Math.abs(currentVelocity) * 0.0004;
-        blob.rotation.x = currentMouse.y * 0.15;
-        blob.rotation.z = currentMouse.x * 0.1;
+        // Slow continuous rotation + subtle parallax tilt toward the cursor.
+        // Reduced-motion users get a near-static blob — still present, not spinning.
+        const rotationSpeed = prefersReducedMotion ? 0.0002 : 0.0015 + Math.abs(currentVelocity) * 0.0004;
+        blob.rotation.y += rotationSpeed;
+        blob.rotation.x = prefersReducedMotion ? 0 : currentMouse.y * 0.15;
+        blob.rotation.z = prefersReducedMotion ? 0 : currentMouse.x * 0.1;
 
         // Camera parallax: very small offset so it reads as "reactive", not "controlled"
         camera.position.x += (currentMouse.x * 0.3 - camera.position.x) * 0.05;
@@ -807,7 +822,11 @@ html.lenis, html.lenis body { height: auto; }
         targetVelocity = v;
       }
 
-      return { tick, resize, setVelocity };
+      function setVisible(v) {
+        isVisible = v;
+      }
+
+      return { tick, resize, setVelocity, setVisible };
     }
 
     /* =================================================================
@@ -817,12 +836,17 @@ html.lenis, html.lenis body { height: auto; }
        ================================================================= */
     function animateHeroIn() {
       const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       // Decrypt-style scramble runs in parallel with the mask slide-up,
       // staggered the same way, so text "materializes" as it slides into place.
-      gsap.utils.toArray('.hero-title .line-inner').forEach((el, i) => {
-        gsap.delayedCall(i * 0.12, () => scrambleReveal(el, 1.0));
-      });
+      // Skipped under reduced-motion since rapid character flicker is exactly
+      // the kind of motion those users have asked to avoid.
+      if (!prefersReducedMotion) {
+        gsap.utils.toArray('.hero-title .line-inner').forEach((el, i) => {
+          gsap.delayedCall(i * 0.12, () => scrambleReveal(el, 1.0));
+        });
+      }
 
       tl.to('.hero-title .line-inner', {
         y: '0%',
@@ -1037,6 +1061,39 @@ html.lenis, html.lenis body { height: auto; }
       });
     }
 
+    /**
+     * initPerfGating
+     * Two independent perf wins, stacked:
+     * 1. IntersectionObserver — stop rendering the 3D scene entirely once
+     *    the hero scrolls out of view (it's pointless GPU work if nobody
+     *    can see it).
+     * 2. Page Visibility API — stop rendering when the browser tab itself
+     *    is backgrounded (switched away from), saving battery.
+     */
+    function initPerfGating(blobScene) {
+      const heroSection = document.getElementById('hero');
+      let heroInView = true;
+      let tabVisible = !document.hidden;
+
+      const updateVisibility = () => {
+        blobScene.setVisible(heroInView && tabVisible);
+      };
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          heroInView = entries[0].isIntersecting;
+          updateVisibility();
+        },
+        { threshold: 0 }
+      );
+      observer.observe(heroSection);
+
+      document.addEventListener('visibilitychange', () => {
+        tabVisible = !document.hidden;
+        updateVisibility();
+      });
+    }
+
     /* =================================================================
        INIT
        ================================================================= */
@@ -1059,8 +1116,13 @@ html.lenis, html.lenis body { height: auto; }
         blobScene.tick();
       });
 
-      initCustomCursor();
-      initMagnetic();
+      initPerfGating(blobScene);
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!prefersReducedMotion) {
+        initCustomCursor();
+        initMagnetic();
+      }
 
       await runPreloader();
       document.body.classList.add('is-ready');
