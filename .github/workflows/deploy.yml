@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+# Runs automatically every time you push/commit to the main branch —
+# including edits made directly in GitHub's browser-based editor, so
+# no local git or command line is ever required.
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: # also lets you manually trigger a redeploy from the Actions tab
+
+# Minimal permissions needed to publish to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment should run at a time; cancel any in-progress run
+# if a newer push comes in before it finishes.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site as Pages artifact
+        # path: '.' means "the whole repo root" — since this site is a
+        # single static index.html with no build step, there's nothing
+        # to compile; we just package the files as-is.
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
