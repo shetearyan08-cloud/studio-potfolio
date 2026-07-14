@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Studio — Immersive Portfolio</title>
+<meta name="description" content="An award-winning immersive digital experience." />
+
+<style>
+/* ===================================================================
+   RESET
+   =================================================================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: auto; /* Lenis handles smoothness; native scroll-behavior would conflict */
+}
+
+body {
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; }
+a { color: inherit; text-decoration: none; }
+ul, ol { list-style: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===================================================================
+   MAIN STYLES
+   =================================================================== */
+:root {
+  --color-bg: #0a0a0a;
+  --color-fg: #f2f2f0;
+  --color-accent: #ff4d1c;
+  --header-height: 90px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Preloader */
+#preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+.preloader__inner {
+  font-size: clamp(3rem, 10vw, 6rem);
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.preloader__bar {
+  width: 200px;
+  height: 2px;
+  background: rgba(242, 242, 240, 0.15);
+  overflow: hidden;
+}
+.preloader__bar-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--color-fg);
+  transform-origin: left;
+}
+
+/* Lenis required styles */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* Layout */
+.site-header {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(24px, 5vw, 64px);
+  z-index: 100;
+  mix-blend-mode: difference;
+}
+.site-header nav { display: flex; gap: 32px; }
+
+.section { min-height: 100vh; width: 100%; position: relative; }
+.section--hero { display: flex; align-items: center; justify-content: center; }
+.site-footer { padding: 64px; text-align: center; }
+</style>
+</head>
+<body>
+
+  <!-- PRELOADER -->
+  <div id="preloader" aria-hidden="true">
+    <div class="preloader__inner">
+      <span class="preloader__digit">0</span>
+      <span class="preloader__percent">%</span>
+    </div>
+    <div class="preloader__bar">
+      <div class="preloader__bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- LENIS SMOOTH SCROLL WRAPPER: everything scrollable lives inside this -->
+  <div id="smooth-wrapper">
+    <div id="smooth-content">
+
+      <header class="site-header" data-nav>
+        <div class="logo">STUDIO</div>
+        <nav>
+          <a href="#work">Work</a>
+          <a href="#about">About</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </header>
+
+      <main>
+        <section id="hero" class="section section--hero">
+          <!-- Phase 2 content goes here -->
+          <h1>Hero Placeholder</h1>
+        </section>
+
+        <section id="work" class="section">
+          <!-- Phase 3 content goes here -->
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>&copy; 2026 Studio. All rights reserved.</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       SCRIPTS
+       All libraries load straight from a CDN as ES modules — nothing to
+       install, nothing to build. This works both here in the preview and
+       once uploaded to GitHub Pages.
+       =================================================================== -->
+  <script type="module">
+    import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm';
+    import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js/+esm';
+    import Lenis from 'https://cdn.jsdelivr.net/npm/lenis@1.1.13/+esm';
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    /**
+     * initSmoothScroll
+     * Bridges Lenis (virtual smooth scroll) with GSAP ScrollTrigger.
+     * This sync is the single most important wiring in the whole site —
+     * get it wrong and every scroll-triggered animation will jitter or desync.
+     */
+    function initSmoothScroll() {
+      const lenis = new Lenis({
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // expo-out
+        orientation: 'vertical',
+        gestureOrientation: 'vertical',
+        smoothWheel: true,
+        wheelMultiplier: 1,
+        touchMultiplier: 2,
+        syncTouch: false,
+      });
+
+      // Drive Lenis from GSAP's own ticker so both update on the exact same frame.
+      gsap.ticker.add((time) => {
+        lenis.raf(time * 1000);
+      });
+
+      // Tell ScrollTrigger to recalculate on every Lenis scroll tick.
+      lenis.on('scroll', ScrollTrigger.update);
+
+      // Lenis already smooths; stacking GSAP's own lag smoothing on top causes drift.
+      gsap.ticker.lagSmoothing(0);
+
+      window.addEventListener('load', () => ScrollTrigger.refresh());
+
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => ScrollTrigger.refresh(), 200);
+      });
+
+      return lenis;
+    }
+
+    /**
+     * runPreloader
+     * A minimal, high-end preloader: animated percentage counter + progress bar.
+     * Resolves once the outro animation has fully finished, so hero animations
+     * (added in Phase 2) can safely kick off right after.
+     */
+    function runPreloader() {
+      return new Promise((resolve) => {
+        const preloaderEl = document.getElementById('preloader');
+        const digitEl = preloaderEl.querySelector('.preloader__digit');
+        const barFillEl = preloaderEl.querySelector('.preloader__bar-fill');
+
+        const progress = { value: 0 };
+
+        const tl = gsap.timeline({
+          onComplete: () => {
+            preloaderEl.remove();
+            resolve();
+          },
+        });
+
+        tl.to(progress, {
+          value: 100,
+          duration: 1.8,
+          ease: 'power2.inOut',
+          onUpdate: () => {
+            const val = Math.floor(progress.value);
+            digitEl.textContent = val;
+            barFillEl.style.width = `${val}%`;
+          },
+        });
+
+        tl.to(preloaderEl, {
+          yPercent: -100,
+          duration: 1,
+          ease: 'power4.inOut',
+        }, '+=0.2');
+      });
+    }
+
+    async function init() {
+      const lenis = initSmoothScroll();
+      await runPreloader();
+      document.body.classList.add('is-ready');
+      window.__lenis = lenis; // exposed for debugging / later phases
+    }
+
+    init();
+  </script>
+</body>
+</html>
