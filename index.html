@@ -44,9 +44,9 @@ ul, ol { list-style: none; }
    MAIN STYLES
    =================================================================== */
 :root {
-  --color-bg: #0a0a0a;
+  --color-bg: #08080a;
   --color-fg: #f2f2f0;
-  --color-accent: #ff4d1c;
+  --color-fg-dim: rgba(242, 242, 240, 0.6);
   --header-height: 90px;
 }
 
@@ -109,10 +109,100 @@ html.lenis, html.lenis body { height: auto; }
   mix-blend-mode: difference;
 }
 .site-header nav { display: flex; gap: 32px; }
+.site-header .logo, .site-header nav a {
+  opacity: 0; /* animated in on load */
+}
 
 .section { min-height: 100vh; width: 100%; position: relative; }
-.section--hero { display: flex; align-items: center; justify-content: center; }
 .site-footer { padding: 64px; text-align: center; }
+
+/* ===================================================================
+   HERO SECTION
+   =================================================================== */
+.section--hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #14141a 0%, #08080a 70%);
+}
+
+#hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  /* Canvas sits behind the text but above the section background gradient */
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0 24px;
+  pointer-events: none; /* let mouse events pass through to canvas for parallax */
+}
+
+.hero-title {
+  font-size: clamp(2.8rem, 9vw, 7.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  overflow: hidden; /* required for the line-mask reveal */
+}
+
+/* Each line is wrapped so we can mask/reveal it independently */
+.hero-title .line {
+  overflow: hidden;
+}
+.hero-title .line-inner {
+  display: block;
+  transform: translateY(110%); /* GSAP animates this to 0 */
+  will-change: transform;
+}
+
+.hero-subtext {
+  margin-top: 24px;
+  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  color: var(--color-fg-dim);
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+/* Scroll-down micro-interaction */
+.scroll-cue {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-fg-dim);
+}
+.scroll-cue__track {
+  width: 1px;
+  height: 40px;
+  background: rgba(242, 242, 240, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+.scroll-cue__dot {
+  position: absolute;
+  top: -8px;
+  left: -1.5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-fg);
+}
 </style>
 </head>
 <body>
@@ -143,8 +233,24 @@ html.lenis, html.lenis body { height: auto; }
 
       <main>
         <section id="hero" class="section section--hero">
-          <!-- Phase 2 content goes here -->
-          <h1>Hero Placeholder</h1>
+          <canvas id="hero-canvas"></canvas>
+
+          <div class="hero-content">
+            <h1 class="hero-title" id="hero-title">
+              <span class="line"><span class="line-inner">Placeholder</span></span>
+              <span class="line"><span class="line-inner">Headline Text</span></span>
+            </h1>
+            <p class="hero-subtext" id="hero-subtext">
+              Replace this with your real tagline whenever you're ready.
+            </p>
+          </div>
+
+          <div class="scroll-cue" id="scroll-cue">
+            <span>Scroll</span>
+            <div class="scroll-cue__track">
+              <div class="scroll-cue__dot"></div>
+            </div>
+          </div>
         </section>
 
         <section id="work" class="section">
@@ -162,26 +268,23 @@ html.lenis, html.lenis body { height: auto; }
   <!-- ===================================================================
        SCRIPTS
        All libraries load straight from a CDN as ES modules — nothing to
-       install, nothing to build. This works both here in the preview and
-       once uploaded to GitHub Pages.
+       install, nothing to build.
        =================================================================== -->
   <script type="module">
     import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm';
     import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js/+esm';
     import Lenis from 'https://cdn.jsdelivr.net/npm/lenis@1.1.13/+esm';
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js/+esm';
 
     gsap.registerPlugin(ScrollTrigger);
 
-    /**
-     * initSmoothScroll
-     * Bridges Lenis (virtual smooth scroll) with GSAP ScrollTrigger.
-     * This sync is the single most important wiring in the whole site —
-     * get it wrong and every scroll-triggered animation will jitter or desync.
-     */
+    /* =================================================================
+       1. SMOOTH SCROLL (Lenis <-> GSAP ScrollTrigger sync)
+       ================================================================= */
     function initSmoothScroll() {
       const lenis = new Lenis({
         duration: 1.2,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // expo-out
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         orientation: 'vertical',
         gestureOrientation: 'vertical',
         smoothWheel: true,
@@ -190,19 +293,10 @@ html.lenis, html.lenis body { height: auto; }
         syncTouch: false,
       });
 
-      // Drive Lenis from GSAP's own ticker so both update on the exact same frame.
-      gsap.ticker.add((time) => {
-        lenis.raf(time * 1000);
-      });
-
-      // Tell ScrollTrigger to recalculate on every Lenis scroll tick.
       lenis.on('scroll', ScrollTrigger.update);
-
-      // Lenis already smooths; stacking GSAP's own lag smoothing on top causes drift.
       gsap.ticker.lagSmoothing(0);
 
       window.addEventListener('load', () => ScrollTrigger.refresh());
-
       let resizeTimeout;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
@@ -212,18 +306,14 @@ html.lenis, html.lenis body { height: auto; }
       return lenis;
     }
 
-    /**
-     * runPreloader
-     * A minimal, high-end preloader: animated percentage counter + progress bar.
-     * Resolves once the outro animation has fully finished, so hero animations
-     * (added in Phase 2) can safely kick off right after.
-     */
+    /* =================================================================
+       2. PRELOADER
+       ================================================================= */
     function runPreloader() {
       return new Promise((resolve) => {
         const preloaderEl = document.getElementById('preloader');
         const digitEl = preloaderEl.querySelector('.preloader__digit');
         const barFillEl = preloaderEl.querySelector('.preloader__bar-fill');
-
         const progress = { value: 0 };
 
         const tl = gsap.timeline({
@@ -244,19 +334,253 @@ html.lenis, html.lenis body { height: auto; }
           },
         });
 
-        tl.to(preloaderEl, {
-          yPercent: -100,
-          duration: 1,
-          ease: 'power4.inOut',
-        }, '+=0.2');
+        tl.to(preloaderEl, { yPercent: -100, duration: 1, ease: 'power4.inOut' }, '+=0.2');
       });
     }
 
+    /* =================================================================
+       3. HERO 3D BLOB
+       A single sphere mesh, displaced by simplex noise in the vertex
+       shader (for slow organic morphing) and colored with a fresnel-
+       based iridescent gradient in the fragment shader (for the
+       jewel-toned / metallic-sheen "premium SaaS" look).
+       No textures, no heavy geometry — just math — so it stays light.
+       ================================================================= */
+    function initHeroBlob(canvas) {
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        canvas.clientWidth / canvas.clientHeight,
+        0.1,
+        100
+      );
+      camera.position.set(0, 0, 5.2);
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true, // transparent background so the CSS gradient behind shows through
+      });
+      renderer.setClearColor(0x000000, 0); // fully transparent clear
+      // Cap pixel ratio at 2 — going higher on retina/4K screens tanks perf for no visible gain
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // High-ish segment count for a smooth organic surface once displaced.
+      // 128x128 is plenty detailed but still cheap for a single hero object.
+      const geometry = new THREE.SphereGeometry(1.4, 128, 128);
+
+      const uniforms = {
+        u_time: { value: 0 },
+        u_mouse: { value: new THREE.Vector2(0, 0) },
+        // Deep jewel tones: violet -> teal -> amber, mixed via fresnel/normal
+        u_colorA: { value: new THREE.Color('#5b2a86') }, // deep violet
+        u_colorB: { value: new THREE.Color('#0f8b8d') }, // deep teal
+        u_colorC: { value: new THREE.Color('#c9a24b') }, // muted gold/metallic
+      };
+
+      const material = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: `
+          uniform float u_time;
+          uniform vec2 u_mouse;
+          varying vec3 v_normal;
+          varying vec3 v_position;
+
+          // --- Ashima simplex 3D noise (compact, industry-standard implementation) ---
+          vec3 mod289(vec3 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
+          vec4 mod289(vec4 x){ return x - floor(x * (1.0/289.0)) * 289.0; }
+          vec4 permute(vec4 x){ return mod289(((x*34.0)+1.0)*x); }
+          vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
+
+          float snoise(vec3 v){
+            const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+            const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+            vec3 i  = floor(v + dot(v, C.yyy));
+            vec3 x0 = v - i + dot(i, C.xxx);
+            vec3 g = step(x0.yzx, x0.xyz);
+            vec3 l = 1.0 - g;
+            vec3 i1 = min(g.xyz, l.zxy);
+            vec3 i2 = max(g.xyz, l.zxy);
+            vec3 x1 = x0 - i1 + C.xxx;
+            vec3 x2 = x0 - i2 + C.yyy;
+            vec3 x3 = x0 - D.yyy;
+            i = mod289(i);
+            vec4 p = permute(permute(permute(
+                      i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+            float n_ = 0.142857142857;
+            vec3 ns = n_ * D.wyz - D.xzx;
+            vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+            vec4 x_ = floor(j * ns.z);
+            vec4 y_ = floor(j - 7.0 * x_);
+            vec4 x = x_ *ns.x + ns.yyyy;
+            vec4 y = y_ *ns.x + ns.yyyy;
+            vec4 h = 1.0 - abs(x) - abs(y);
+            vec4 b0 = vec4(x.xy, y.xy);
+            vec4 b1 = vec4(x.zw, y.zw);
+            vec4 s0 = floor(b0)*2.0 + 1.0;
+            vec4 s1 = floor(b1)*2.0 + 1.0;
+            vec4 sh = -step(h, vec4(0.0));
+            vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+            vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+            vec3 p0 = vec3(a0.xy, h.x);
+            vec3 p1 = vec3(a0.zw, h.y);
+            vec3 p2 = vec3(a1.xy, h.z);
+            vec3 p3 = vec3(a1.zw, h.w);
+            vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+            p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+            vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+            m = m * m;
+            return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+          }
+
+          void main() {
+            v_normal = normalize(normalMatrix * normal);
+
+            // Slow continuous morphing: low frequency noise sampled over time
+            float slow = u_time * 0.15;
+            float displacement = snoise(position * 1.1 + slow) * 0.18;
+
+            // Gentle reactive bulge toward the mouse position — subtle, not literal tracking
+            float mouseInfluence = 0.12 * (u_mouse.x * position.x + u_mouse.y * position.y);
+            displacement += mouseInfluence * 0.05;
+
+            vec3 displaced = position + normal * displacement;
+            v_position = displaced;
+
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 u_colorA;
+          uniform vec3 u_colorB;
+          uniform vec3 u_colorC;
+          varying vec3 v_normal;
+          varying vec3 v_position;
+
+          void main() {
+            // Fresnel term: stronger at grazing angles, creates the "premium sheen" rim light
+            vec3 viewDir = normalize(cameraPosition - v_position);
+            float fresnel = pow(1.0 - max(dot(viewDir, v_normal), 0.0), 2.5);
+
+            // Blend jewel tones based on surface normal direction for an iridescent feel
+            float mixFactor = v_normal.y * 0.5 + 0.5;
+            vec3 baseColor = mix(u_colorA, u_colorB, mixFactor);
+            baseColor = mix(baseColor, u_colorC, fresnel * 0.6);
+
+            // Soft metallic highlight
+            vec3 finalColor = baseColor + vec3(fresnel * 0.35);
+
+            gl_FragColor = vec4(finalColor, 1.0);
+          }
+        `,
+      });
+
+      const blob = new THREE.Mesh(geometry, material);
+      scene.add(blob);
+
+      // Mouse tracking — normalized to -1..1, smoothed via lerp for a gentle,
+      // non-twitchy parallax rather than 1:1 cursor tracking.
+      const targetMouse = { x: 0, y: 0 };
+      const currentMouse = { x: 0, y: 0 };
+
+      window.addEventListener('mousemove', (e) => {
+        targetMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        targetMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      });
+
+      function resize() {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height, false);
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+
+      const clock = new THREE.Clock();
+
+      function tick() {
+        // Smoothly ease current mouse toward target — this is what makes the
+        // reaction feel "gentle" rather than "distracting" per the brief.
+        currentMouse.x += (targetMouse.x - currentMouse.x) * 0.04;
+        currentMouse.y += (targetMouse.y - currentMouse.y) * 0.04;
+
+        uniforms.u_time.value = clock.getElapsedTime();
+        uniforms.u_mouse.value.set(currentMouse.x, currentMouse.y);
+
+        // Slow continuous rotation + subtle parallax tilt toward the cursor
+        blob.rotation.y += 0.0015;
+        blob.rotation.x = currentMouse.y * 0.15;
+        blob.rotation.z = currentMouse.x * 0.1;
+
+        // Camera parallax: very small offset so it reads as "reactive", not "controlled"
+        camera.position.x += (currentMouse.x * 0.3 - camera.position.x) * 0.05;
+        camera.position.y += (currentMouse.y * 0.2 - camera.position.y) * 0.05;
+        camera.lookAt(0, 0, 0);
+
+        renderer.render(scene, camera);
+      }
+
+      return { tick, resize };
+    }
+
+    /* =================================================================
+       4. HERO TEXT ANIMATION
+       Manual line-split reveal (no paid SplitText plugin needed) +
+       staggered fade for subtext/nav.
+       ================================================================= */
+    function animateHeroIn() {
+      const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+
+      tl.to('.hero-title .line-inner', {
+        y: '0%',
+        duration: 1.1,
+        stagger: 0.12,
+      })
+        .to('.hero-subtext', { opacity: 1, y: 0, duration: 0.9 }, '-=0.6')
+        .to('.site-header .logo, .site-header nav a', {
+          opacity: 1,
+          duration: 0.6,
+          stagger: 0.08,
+        }, '-=0.7')
+        .to('#scroll-cue', { opacity: 1, duration: 0.6 }, '-=0.4');
+
+      // Looping scroll-cue dot animation, independent of the intro timeline
+      gsap.to('.scroll-cue__dot', {
+        y: 30,
+        repeat: -1,
+        yoyo: true,
+        duration: 1.4,
+        ease: 'power1.inOut',
+      });
+    }
+
+    /* =================================================================
+       5. INIT
+       ================================================================= */
     async function init() {
       const lenis = initSmoothScroll();
+      const canvas = document.getElementById('hero-canvas');
+      const blobScene = initHeroBlob(canvas);
+
+      // Single requestAnimationFrame driver for everything: GSAP ticker
+      // drives Lenis AND the Three.js render loop, so all three stay
+      // perfectly in sync on the same frame (no competing rAF loops).
+      gsap.ticker.add((time) => {
+        lenis.raf(time * 1000);
+        blobScene.tick();
+      });
+
       await runPreloader();
       document.body.classList.add('is-ready');
-      window.__lenis = lenis; // exposed for debugging / later phases
+      animateHeroIn();
+
+      window.__lenis = lenis;
     }
 
     init();
